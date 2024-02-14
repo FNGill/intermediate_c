@@ -1,0 +1,67 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
+
+
+struct thread_args {
+    int id;
+    char name[32];
+    char color[32];
+};
+
+int counter = 0;
+int num_threads = 0;
+pthread_mutex_t counter_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void* thread_func(void* arg);
+
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <num_threads>\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    int num_threads = atoi(argv[1]);
+
+    pthread_t tid[num_threads];
+    struct thread_args targs[num_threads];
+
+    for (int i = 0; i < num_threads; ++i) {
+        targs[i].id = i + 1;
+        snprintf(targs[i].name, sizeof(targs[i].name), "Thread%d", targs[i].id);
+
+        if (pthread_create(&tid[i], NULL, thread_func, &targs[i]) != 0) {
+            perror("pthread_create");
+            return EXIT_FAILURE;
+        }
+    }
+
+    for (int i = 0; i < num_threads; ++i) {
+        if (pthread_join(tid[i], NULL) != 0) {
+            perror("pthread_join");
+            return EXIT_FAILURE;
+        }
+    }
+
+    printf("Final counter: %d\n", counter);
+    return EXIT_SUCCESS;
+}
+
+void* thread_func(void* arg) {
+    struct thread_args* targs = (struct thread_args*)arg;
+
+    printf("Thread %d started\n", targs->id);
+    for (int i = 0; i < 100; ++i) {
+        pthread_mutex_lock(&counter_mutex);
+        counter++;
+        printf("Thread %d counter value: %d\n", targs->id, counter);
+        pthread_mutex_unlock(&counter_mutex);
+        usleep(10000); // Sleep for 10 milliseconds
+    }
+
+    printf("Thread %d finished\n", targs->id);
+    return NULL;
+}
